@@ -1,0 +1,23 @@
+<div style="text-align:center">
+  <div>
+    <webcam [height]="500" [width]="500" [trigger]="triggerObservable" (imageCapture)="handleImage($event)" *ngIf="showWebcam"
+            [allowCameraSwitch]="allowCameraSwitch" [switchCamera]="nextWebcamObservable"
+            [videoOptions]="videoOptions"
+            [imageQuality]="1"
+            (cameraSwitched)="cameraWasSwitched($event)"
+            (initError)="handleInitError($event)"
+    ></webcam>
+    <br>
+    <button class="actionBtn" (click)="triggerSnapshot();">Take A Snapshot</button>
+    <br>
+    <button class="actionBtn" (click)="showNextWebcam(true);" [disabled]="!multipleWebcamsAvailable">Next Webcam</button>
+  </div>
+</div>
+<div class="snapshot" *ngIf="webcamImage">
+  <h2>Nice one!</h2>
+  <img id="inputImg" #inputImg [src]="webcamImage.imageAsDataUrl" alt="webcam image" style="max-width: 800px;">
+  <button class="actionBtn" (click)="updateResults();">Verificar</button>
+  <canvas id="overlay" width="648" height="480" #overlay></canvas>
+</div>
+
+
