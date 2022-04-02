@@ -15,9 +15,11 @@
 </div>
 <div class="snapshot" *ngIf="webcamImage">
   <h2>Nice one!</h2>
-  <img id="inputImg" #inputImg [src]="webcamImage.imageAsDataUrl" alt="webcam image" style="max-width: 800px;">
+  <img id="inputImg" #inputImg [src]="" alt="webcam image" style="max-width: 800px;">
   <button class="actionBtn" (click)="updateResults();">Verificar</button>
+  
   <canvas id="overlay" width="648" height="480" #overlay></canvas>
+  <div id="facesContainer"></div>
 </div>
 
 

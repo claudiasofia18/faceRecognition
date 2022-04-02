@@ -1,69 +1,92 @@
-import {Component, ElementRef, OnInit, Renderer2, ViewChild} from '@angular/core';
-import {Observable, Subject} from 'rxjs';
-import {WebcamImage} from './modules/webcam/domain/webcam-image';
-import {WebcamUtil} from './modules/webcam/util/webcam.util';
-import {WebcamInitError} from './modules/webcam/domain/webcam-init-error';
-import {FaceApiService} from './face-api.service';
+import { Component, ElementRef, OnInit, Renderer2, ViewChild } from '@angular/core';
+import { Observable, Subject } from 'rxjs';
+import { WebcamImage } from './modules/webcam/domain/webcam-image';
+import { WebcamUtil } from './modules/webcam/util/webcam.util';
+import { WebcamInitError } from './modules/webcam/domain/webcam-init-error';
+import { FaceApiService } from './face-api.service';
 import * as _ from 'lodash';
-import * as faceapi from 'face-api.js';
-import { FaceDetection } from 'face-api.js';
-import  $ from 'jquery'
+import * as faceapi from "face-api.js"
+import $ from "jquery"
+import { VideoPlayerService } from './video-player.service';
+
 @Component({
   selector: 'appRoot',
   templateUrl: './app.component.html',
   styleUrls: ['./app.component.scss']
 })
 export class AppComponent implements OnInit {
-  // toggle webcam on/off
-  
-  public context !: CanvasRenderingContext2D
-  @ViewChild("overlay") canvas : ElementRef
+  @ViewChild("overlay") canvas: ElementRef
+  public width = 800
+  public height = 800
+
+  private cx: CanvasRenderingContext2D
+  @ViewChild("inputImg") myImg: ElementRef
   public showWebcam = true;
   public allowCameraSwitch = true;
   public multipleWebcamsAvailable = false;
   public deviceId: string;
   public facingMode: string = 'environment';
   public messages: any[] = [];
-
+  public cutImage: any
   // latest snapshot
   public webcamImage: WebcamImage = null;
-
+  listEvents: Array<any> = [];
+  public image: any
+  modelsReady: boolean;
   // webcam snapshot trigger
   private trigger: Subject<void> = new Subject<void>();
   // switch to next / previous / specific webcam; true/false: forward/backwards, string: deviceId
-  private nextWebcam: Subject<boolean|string> = new Subject<boolean|string>();
+  private nextWebcam: Subject<boolean | string> = new Subject<boolean | string>();
   constructor(
     private faceApiService: FaceApiService,
     private renderer2: Renderer2,
-    private elementRef: ElementRef
-  ) {}
+    private elementRef: ElementRef,
+    private videoPlayer: VideoPlayerService
+  ) { }
 
   public ngOnInit(): void {
+    const observer1$ = this.faceApiService.cbModels.subscribe(res => {
+      //: TODO Los modelos estan ready!!
+      this.modelsReady = true;
+
+    });
+    const observer2$ = this.videoPlayer.cbAi
+      .subscribe(({ faceImage }) => {
+        console.log(faceImage)
+        /*  const cutCanvas = this.canvas.nativeElement
+          this.cx = cutCanvas.getContext("2d")
+          cutCanvas.width = this.width
+          cutCanvas.height = this.height
+  
+          this.renderer2.appendChild(cutCanvas,  faceImage)*/
+        
+        faceapi.matchDimensions(this.canvas.nativeElement, this.myImg.nativeElement)
+        $('#facesContainer').empty()
+        faceImage.forEach(canvas => $('#facesContainer').append(canvas))
+      });
+
+    this.listEvents = [observer1$, observer2$];
+
   }
 
-  public async triggerSnapshot(): Promise<void> {
-    const inputImgEl = $('#inputImg').get(0)
-    const detections = await faceapi.detectAllFaces(inputImgEl)
-    const faceImages = await faceapi.extractFaces(inputImgEl, detections)
-    this.displayExtractedFaces(faceImages)
-    
-   
-   
+  ngOnDestroy(): void {
+    this.listEvents.forEach(event => event.unsubscribe());
+  }
+
+
+  public triggerSnapshot() {
+    this.trigger.next()
+
+  }
+  async updateResults() {
+    await this.videoPlayer.getLandMark(this.myImg);
+
   }
 
   public toggleWebcam(): void {
     this.showWebcam = !this.showWebcam;
   }
 
- 
-
-   displayExtractedFaces(faceImages) {
-    const canvas = $('#overlay').get(0)
-    faceapi.matchDimensions(canvas, $('#inputImg').get(0))
-    $('#facesContainer').empty()
-    faceImages.forEach(canvas => $('#facesContainer').append(canvas))
-    
-  }
 
   public handleInitError(error: WebcamInitError): void {
     this.messages.push(error);
@@ -83,20 +106,21 @@ export class AppComponent implements OnInit {
       u8arr[n] = bstr.charCodeAt(n);
     }
     const file: File = new File([u8arr], 'fotito', { type: 'image/jpeg' })
-  
+
     return file;
   }
-  public showNextWebcam(directionOrDeviceId: boolean|string): void {
+  public showNextWebcam(directionOrDeviceId: boolean | string): void {
     // true => move forward through devices
     // false => move backwards through devices
     // string => move to device with given deviceId
     this.nextWebcam.next(directionOrDeviceId);
   }
 
-  public handleImage(webcamImage: WebcamImage): void {
+  public async handleImage(webcamImage: WebcamImage): Promise<void> {
     this.addMessage('Received webcam image');
-    console.log(webcamImage);
     this.webcamImage = webcamImage;
+    const image = await faceapi.fetchImage(this.webcamImage.imageAsDataUrl)
+    this.myImg.nativeElement.src = image.src
   }
 
   public cameraWasSwitched(deviceId: string): void {
@@ -114,7 +138,7 @@ export class AppComponent implements OnInit {
     return this.trigger.asObservable();
   }
 
-  public get nextWebcamObservable(): Observable<boolean|string> {
+  public get nextWebcamObservable(): Observable<boolean | string> {
     return this.nextWebcam.asObservable();
   }
 
